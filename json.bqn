@@ -1,6 +1,44 @@
+####
+# This file contains some bindings for libjansson
+# https://github.com/akheron/jansson, a library for reading and
+# writing JSON files
+
+# To read a json file, call one of the constructor functions `Read`, `Parse`, or `FromPointer`
+# then the fields of the objects can be inspected with `.TypeOf`, `.Keys`, `.Values`, `.Get`, `.Set`
+# A common case is to just read the JSON blob as-is, and utility functions `QuickParse` and `QuickRead`
+# do this. For more specific information see the function comments.
+
+# Example:
+# json ← •Import "json.bqn"
+# object ← json.Parse "{ ""a"": [1, 2, 3], ""b"": [""foo"", ""bar"", ""baz""]}"
+#{obj‿rawtype‿typeof‿value‿readarray‿readstring‿readobject‿get‿set‿append‿keys‿values‿copy‿deepcopy‿destroy⇐}
+#   object.TypeOf @
+#"object"
+#   object.Keys @
+#⟨ "a" "b" ⟩
+#   a ← object.Get "a"
+#{obj‿rawtype‿typeof‿value‿readarray‿readstring‿readobject‿get‿set‿append‿keys‿values‿copy‿deepcopy‿destroy⇐}
+#   a.Value @
+#⟨ 1 2 3 ⟩
+#   object.Value @
+#┌─
+#╵ "a" ⟨ 1 2 3 ⟩
+#  "b" ⟨ "foo" "bar" "baz" ⟩
+#                            ┘
+# json.QuickParse "{ ""a"": [1, 2, 3], ""b"": [""foo"", ""bar"", ""baz""]}"
+#┌─
+#╵ "a" ⟨ 1 2 3 ⟩
+#  "b" ⟨ "foo" "bar" "baz" ⟩
+#                            ┘
+
+# todo: refcounting, test json creation and mutation
+
 libc ← •Import "c.bqn"
 path ← "/usr/lib64/libjansson.so"
 
+# Read the input text as a JSON string, and return its value
+# param json: the BQN string containing the full json text
+# returns: a BQN value representing the parsed JSON, or @ if it is invalid
 QuickParse ⇐ { 𝕊 json:
  obj ← Parse json
  value ← obj.Value @
@@ -8,6 +46,9 @@ QuickParse ⇐ { 𝕊 json:
  value
 }
 
+# Read the file at `path` and return its value
+# param path: a string path to a JSON file
+# returns: a BQN value representing the contents of the JSON file, or @ if it is invalid
 QuickRead ⇐ { 𝕊 path:
  obj ← Read path
  value ← obj.Value @
@@ -15,27 +56,50 @@ QuickRead ⇐ { 𝕊 path:
  value
 }
 
+# Build a JSON namespace wrapping the supplied libjansson handle 
+# this is only useful to call if accessing things via the `ffi` namespace directly
+# param 𝕩: the i8 array representing the json_t *
+# returns: a JSON namespace
 FromPointer ⇐ { 𝕊 𝕩:
  obj ⇐ 𝕩
+
+ # The integer value of the type enum
+ # 𝕩: ·
+ # returns: the integer value of the json_type enum
  RawType ⇐ { 𝕊𝕩: obj ≡ 8⥊0 ? 7 ; ⊑ libc.MakeI32Vec ⟨1, obj⟩ }
+
+ # The type of the JSON object represented by this namespace
+ # 𝕩: ·
+ # returns: a string representing the type, e.g. "array", "object", or "real"
  TypeOf ⇐  { 𝕊𝕩: (RawType obj) ⊑ ffi.types }
 
+ # Produces the BQN value of this JSON value. If this is an array or object, then it is recursively
+ # produced. Atomic types are mapped, as are lists. Objects become rank-2 arrays where on each row
+ # the first cell is the key and the second cell is the value.
+ # param 𝕩: ·
+ # returns: the BQN representation of this JSON value
  Value ⇐ { 𝕊𝕩:
   accessor ← (RawType ⊑ ⟨readObject, readArray, readString, ffi.json_number_value, ffi.json_number_value, 1, 0, @⟩˙) obj
   Accessor obj
  }
 
+ # Reads the JSON value as an array
+ # throws if the value is not an array
  ReadArray ⇐ { 𝕊 𝕩:
   "JSON value is not an array" ! "array" ≡ TypeOf @
   n ← ffi.JSON_Array_Size obj
   {𝕊𝕩: o ← FromPointer ffi.JSON_Array_Get ⟨obj, 𝕩⟩ ⋄ o.Value @ }¨ ↕n
  }
 
+ # Reads the JSON value as a string
+ # throws if the value is not a string
  ReadString ⇐ { 𝕊𝕩:
   "JSON value is not a string" ! "string" ≡ TypeOf @
   libc.From_CString ffi.JSON_String_Value obj
  }
 
+ # Reads the JSON value as an object
+ # throws if the value is not an object
  ReadObject ⇐ { 𝕊𝕩:
   "JSON value is not an object" ! "object" ≡ TypeOf @
   output ← ⟨⟩
@@ -90,9 +154,9 @@ FromPointer ⇐ { 𝕊 𝕩:
  Copy ⇐ { 𝕊𝕩: FromPointer ffi.JSON_Copy obj }
  DeepCopy ⇐ { 𝕊x: FromPointer ffi.JSON_Deep_Copy obj }
  Destroy ⇐ {𝕊𝕩:
+  obj ≡ 8 ⥊ 0 ? @ ;
   # this can't actually decrement ref counts, since those are macros and not functions to call
   # todo: handle refcounting properly for these objects
-  "Cannot destroy a null object" ! obj ≢ 8⥊0 
   count ← 2 ⊑ libc.MakeI32Vec ⟨3, obj⟩ # probably not more than 2⋆32 references...
   count ≡ 1 ? { ffi.JSON_Delete obj ⋄ obj ↩ 8⥊0 ⋄ @ } ; @
  }
