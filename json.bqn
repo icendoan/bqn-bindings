@@ -1,6 +1,20 @@
 libc ← •Import "c.bqn"
 path ← "/usr/lib64/libjansson.so"
 
+QuickParse ⇐ { 𝕊 json:
+ obj ← Parse json
+ value ← obj.Value @
+ obj.Destroy @
+ value
+}
+
+QuickRead ⇐ { 𝕊 path:
+ obj ← Read path
+ value ← obj.Value @
+ obj.Destroy @
+ value
+}
+
 FromPointer ⇐ { 𝕊 𝕩:
  obj ⇐ 𝕩
  RawType ⇐ { 𝕊𝕩: obj ≡ 8⥊0 ? 7 ; ⊑ libc.MakeI32Vec ⟨1, obj⟩ }
