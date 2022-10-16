@@ -52,9 +52,36 @@ FromPointer ⇐ { 𝕊 𝕩:
   ffi.JSON_Array_Size obj
  }
 
+ Keys ⇐ { 𝕊𝕩: 
+  "JSON value is not an object or an array" ! ⊑ (< TypeOf @) ∊ ⟨"array", "object"⟩
+  (TypeOf @) 𝕊 𝕩 ;
+ "object" 𝕊 𝕩:
+  k ← ⟨⟩
+  { 𝕊 iter: k ↩ k ∾ <libc.From_CString ffi.JSON_Object_Iter_Key iter, ffi.JSON_Object_Iter_Next ⟨obj, iter⟩} •_while_ {𝕊𝕩: 𝕩 ≢ 8⥊0} ffi.JSON_Object_Iter obj
+  k ;
+  "array" 𝕊 𝕩: ↕ ffi.JSON_Array_Size obj ;
+  𝕨 𝕊 𝕩: !˜ "JSON value is not an object or an array"
+ }
+
+ Values ⇐ {
+  𝕊𝕩: (TypeOf @) 𝕊 𝕩;
+  "array" 𝕊 𝕩: ReadArray 𝕩 ;
+  "object" 𝕊 𝕩:
+   v ← ⟨⟩
+   { 𝕊 iter: v ↩ v ∾ < (FromPointer ffi.JSON_Object_Iter_Value iter).Value @, ffi.JSON_Object_Iter_Next ⟨obj, iter⟩} •_while_ {𝕊𝕩: 𝕩≢8⥊0} ffi.JSON_Object_Iter obj
+   v ;
+   𝕨𝕊𝕩: Value @
+ }
+
  Copy ⇐ { 𝕊𝕩: FromPointer ffi.JSON_Copy obj }
  DeepCopy ⇐ { 𝕊x: FromPointer ffi.JSON_Deep_Copy obj }
- #Destroy ⇐ { 𝕊𝕩: ffi.Json_DecRef obj ⋄ obj ↩ 8⥊0 ⋄ @ }
+ Destroy ⇐ {𝕊𝕩:
+  # this can't actually decrement ref counts, since those are macros and not functions to call
+  # todo: handle refcounting properly for these objects
+  "Cannot destroy a null object" ! obj ≢ 8⥊0 
+  count ← 2 ⊑ libc.MakeI32Vec ⟨3, obj⟩ # probably not more than 2⋆32 references...
+  count ≡ 1 ? { ffi.JSON_Delete obj ⋄ obj ↩ 8⥊0 ⋄ @ } ; @
+ }
 }
 
 Parse ⇐ { 𝕊 text:
@@ -155,4 +182,5 @@ ffi ⇐ {
 
  json_copy ⇐ path •FFI ⟨json_t_ptr, "json_copy", '>' ∾ json_t_ptr⟩
  json_deep_copy ⇐ path •FFI ⟨json_t_ptr, "json_deep_copy", '>' ∾ json_t_ptr⟩
+ json_delete ⇐ path •FFI ⟨"", "json_delete", '>' ∾ json_t_ptr⟩
 }
