@@ -1,3 +1,4 @@
+libc ← •Import "c.bqn"
 path ← "/usr/lib64/libcurl.so"
 
 # Corresponds to the CURLoptions enum
@@ -15,11 +16,11 @@ Get ⇐ {
 file 𝕊 url:
  #handle ← ffi.Curl_Easy_Init @
  ffi.Curl_Easy_Setopt_Str ⟨handle, options.url, url ∾ @⟩
- file_ptr ← ffi.FOpen ⟨file ∾ @, "w+" ∾ @⟩
+ file_ptr ← libc.FOpen ⟨file ∾ @, "w+" ∾ @⟩
  ffi.Curl_Easy_Setopt_Ptr ⟨handle, options. write_data, file_ptr⟩
  ffi.Curl_Easy_Perform handle
  #ffi.Curl_Easy_Cleanup handle
- ffi.FClose file_ptr
+ libc.FClose file_ptr
  •file.Chars file
 }
 
@@ -45,10 +46,6 @@ ffi ⇐ {
   curl_easy_escape ⇐ path •FFI ⟨opaque_ptr, "curl_easy_escape", opaque_ptr, string, "i32"⟩
 
   curl_free ⇐ path •FFI ⟨"", "curl_free", '>' ∾ opaque_ptr⟩
-
-  # from libc, for the data storage
-  fopen ⇐ @ •FFI ⟨opaque_ptr, "fopen", string, string⟩
-  fclose ⇐ @ •FFI ⟨"", "fclose", '>' ∾ opaque_ptr⟩
 }
 
 handle ⇐ ffi.Curl_Easy_Init @

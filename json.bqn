@@ -1,8 +1,9 @@
+libc ← •Import "c.bqn"
 path ← "/usr/lib64/libjansson.so"
 
 FromPointer ⇐ { 𝕊 𝕩:
  obj ⇐ 𝕩
- RawType ⇐ { 𝕊𝕩: obj ≡ 8⥊0 ? 7 ; ⊑ ffi.Read_Struct ⟨1, obj⟩ }
+ RawType ⇐ { 𝕊𝕩: obj ≡ 8⥊0 ? 7 ; ⊑ libc.MakeI32Vec ⟨1, obj⟩ }
  TypeOf ⇐  { 𝕊𝕩: (RawType obj) ⊑ ffi.types }
 
  Value ⇐ { 𝕊𝕩:
@@ -18,14 +19,14 @@ FromPointer ⇐ { 𝕊 𝕩:
 
  ReadString ⇐ { 𝕊𝕩:
   "JSON value is not a string" ! "string" ≡ TypeOf @
-  ffi.From_CString ffi.JSON_String_Value obj
+  libc.From_CString ffi.JSON_String_Value obj
  }
 
  ReadObject ⇐ { 𝕊𝕩:
   "JSON value is not an object" ! "object" ≡ TypeOf @
   output ← ⟨⟩
   { 𝕊iter:
-   key ← ffi.From_CString ffi.JSON_Object_Iter_Key iter
+   key ← libc.From_CString ffi.JSON_Object_Iter_Key iter
    value ← FromPointer ffi.JSON_Object_Iter_Value iter
    output ↩ output ∾ key ⋈ value.Value @
    ffi.JSON_Object_Iter_Next ⟨obj, iter⟩
@@ -84,14 +85,9 @@ ffi ⇐ {
  }
 
  types ⇐ ⟨"object", "array", "string", "integer", "real", "true", "false", "null"⟩
- read_struct ⇐ @ •FFI ⟨"a", "bqn_makeI32Vec", "u64", json_t_ptr⟩
- strlen ⇐ @ •FFI ⟨"u64", "strlen", '>' ∾ opaque_ptr⟩ 
- read_string ⇐ @ •FFI ⟨"a", "bqn_makeUTF8Str", "u64", opaque_ptr⟩
- From_CString ⇐ Read_String ∘ (StrLen ⋈ ⊢)
-
+ 
  #json_incref ⇐ path •FFI ⟨json_t_ptr, "json_incref", '>' ∾ json_t_ptr⟩
  #json_decref ⇐ path •FFI ⟨"", "json_decref", '>' ∾ json_t_ptr⟩
-
  json_true ⇐ path •FFI ⟨json_t_ptr, "json_true"⟩
  json_false ⇐ path •FFI ⟨json_t_ptr, "json_false"⟩
  json_null ⇐ path •FFI ⟨json_t_ptr, "json_null"⟩
